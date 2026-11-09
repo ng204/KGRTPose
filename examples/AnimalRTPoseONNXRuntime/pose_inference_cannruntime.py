@@ -2,20 +2,14 @@
 
 import argparse
 import os
+from datetime import datetime
 
 import cv2
 import numpy as np
-import torch
+from ais_bench.infer.interface import InferSession
 
 from ultralytics.utils import yaml_load
 from ultralytics.utils.checks import check_yaml
-
-from ais_bench.infer.interface import InferSession
-
-
-
-
-from datetime import datetime
 
 
 def measure_time(func, *args, **kwargs):
@@ -27,22 +21,22 @@ def measure_time(func, *args, **kwargs):
 
 
 class AnimalRTPose:
-    """
-    Animal pose inference example using ONNXRuntime
-    """
+    """Animal pose inference example using ONNXRuntime."""
 
-    def __init__(self, model_path,
-                 source,
-                 conf,
-                 iou,
-                 data,
-                 draw_detections_action=True,
-                 draw_keypoints_action=True,
-                 draw_skeleton_action=True,
-                 radius=5,
-                 line_width=1):
-        """
-        Initializes an instance of the AnimalRTPose class.
+    def __init__(
+        self,
+        model_path,
+        source,
+        conf,
+        iou,
+        data,
+        draw_detections_action=True,
+        draw_keypoints_action=True,
+        draw_skeleton_action=True,
+        radius=5,
+        line_width=1,
+    ):
+        """Initializes an instance of the AnimalRTPose class.
 
         Args:
             model: Path to the ONNX model or TensorRT model.
@@ -57,7 +51,7 @@ class AnimalRTPose:
         self.model = None
         self.source = source
         self.conf = conf
-        self.iou= iou
+        self.iou = iou
 
         self.data = data
         self.draw_detections_action = draw_detections_action
@@ -66,7 +60,6 @@ class AnimalRTPose:
 
         self.radius = radius
         self.line_width = line_width
-
 
         # Load the class names from the COCO dataset
         self.classes = yaml_load(check_yaml(data))["names"]
@@ -78,10 +71,8 @@ class AnimalRTPose:
         self.keypoints_color_palette = np.random.uniform(0, 255, size=(self.keypoints, 3))
         self.skeleton_color_palette = np.random.uniform(0, 255, size=(len(self.skeleton), 3))
 
-
     def preprocess(self, input_image):
-        """
-        Preprocesses the input image before performing inference.
+        """Preprocesses the input image before performing inference.
 
         Returns:
             image_data: Preprocessed image data ready for inference.
@@ -97,17 +88,22 @@ class AnimalRTPose:
         ox = self.input_width - scale * img_width
         oy = self.input_height - scale * img_height
 
-        M = np.array([
-            [scale, 0, ox],
-            [0, scale, oy],
-            ], dtype="float32"
+        M = np.array(
+            [
+                [scale, 0, ox],
+                [0, scale, oy],
+            ],
+            dtype="float32",
         )
 
-        img = cv2.warpAffine(img, M,
-                             (self.input_width, self.input_height),
-                             flags=cv2.INTER_LINEAR,
-                             borderMode=cv2.BORDER_CONSTANT,
-                             borderValue=(114, 114, 114))
+        img = cv2.warpAffine(
+            img,
+            M,
+            (self.input_width, self.input_height),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(114, 114, 114),
+        )
 
         IM = cv2.invertAffineTransform(M)
 
@@ -126,13 +122,12 @@ class AnimalRTPose:
         # Return the preprocessed image data
         return img, IM
 
-    def postprocess(self, pred, IM=[]):
-        """
-        Performs post-processing on the model's output to extract bounding boxes, scores, and class IDs.
+    def postprocess(self, pred, IM=None):
+        """Performs post-processing on the model's output to extract bounding boxes, scores, and class IDs.
 
         Args:
-            pred (numpy.ndarray): The output of the model.
-            1, 8400, boxes + classes + keypoints * 3 [cx, cy, w, h, conf1, ..., confn, nk*3]
+            pred (numpy.ndarray): The output of the model. 1, 8400, boxes + classes + keypoints * 3 [cx, cy, w, h,
+                conf1, ..., confn, nk*3]
             for example: for ap10k, it has 50 classes and 17 keypoints, so
             pred's shape is [1,8400, 4+50+17*3].
             IM (list): The list of input images to draw detections on.
@@ -141,6 +136,8 @@ class AnimalRTPose:
             numpy.ndarray: The input image with detections drawn on it.
         """
         # Transpose and squeeze the output to match the expected shape
+        if IM is None:
+            IM = []
         outputs = np.transpose(np.squeeze(pred[0]))
 
         # Get the number of rows in the outputs array
@@ -155,7 +152,7 @@ class AnimalRTPose:
         # Iterate over each row in the outputs array
         for i in range(rows):
             # Extract the class scores from the current row
-            classes_scores = outputs[i][4:4+len(self.classes)]
+            classes_scores = outputs[i][4 : 4 + len(self.classes)]
 
             # Find the maximum score among the class scores
             max_score = np.amax(classes_scores)
@@ -174,7 +171,7 @@ class AnimalRTPose:
                 width = w * IM[0][0]
                 height = h * IM[1][1]
 
-                keypoints = outputs[i][4+len(self.classes):].reshape(-1, 3)
+                keypoints = outputs[i][4 + len(self.classes) :].reshape(-1, 3)
                 keypoints[:, 0] = keypoints[:, 0] * IM[0][0] + IM[0][2]
                 keypoints[:, 1] = keypoints[:, 1] * IM[1][1] + IM[1][2]
 
@@ -199,24 +196,23 @@ class AnimalRTPose:
             class_ids = class_ids[indices]
             scores = scores[indices]
             results = {
-                'boxes': boxes,
-                'keypoints_list': keypoints_list,
-                'class_ids': class_ids,
-                'scores': scores,
+                "boxes": boxes,
+                "keypoints_list": keypoints_list,
+                "class_ids": class_ids,
+                "scores": scores,
             }
         else:
             results = {
-                'boxes': None,
-                'keypoints_list': None,
-                'class_ids': None,
-                'scores': None,
+                "boxes": None,
+                "keypoints_list": None,
+                "class_ids": None,
+                "scores": None,
             }
         # Return the modified input image
         return results
 
     def draw_detections(self, img, box, score, class_id):
-        """
-        Draws bounding boxes and labels on the input image based on the detected objects.
+        """Draws bounding boxes and labels on the input image based on the detected objects.
 
         Args:
             img: The input image to draw detections on.
@@ -248,32 +244,19 @@ class AnimalRTPose:
 
         # Draw a filled rectangle as the background for the label text
         cv2.rectangle(
-            img,
-            (label_x, label_y - label_height),
-            (label_x + label_width, label_y + label_height), color, cv2.FILLED
+            img, (label_x, label_y - label_height), (label_x + label_width, label_y + label_height), color, cv2.FILLED
         )
 
         # Draw the label text on the image
-        cv2.putText(img, label,
-                    (label_x, label_y),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 0, 0),
-                    1, cv2.LINE_AA)
+        cv2.putText(img, label, (label_x, label_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
     def draw_keypoints(self, img, keypoints, radius=5):
         for i, keypoint in enumerate(keypoints):
             x, y = keypoint[0], keypoint[1]
             color_k = [int(x) for x in self.keypoints_color_palette[i]]
 
-            if x!=0 and y!=0:
-                cv2.circle(img,
-                           (int(x), int(y)),
-                           radius=radius,
-                           color=color_k,
-                           thickness=-1,
-                           lineType=cv2.LINE_AA)
-
+            if x != 0 and y != 0:
+                cv2.circle(img, (int(x), int(y)), radius=radius, color=color_k, thickness=-1, lineType=cv2.LINE_AA)
 
     def draw_skeleton(self, img, keypoints, line_width=1):
         for i, sk in enumerate(self.skeleton):
@@ -283,22 +266,14 @@ class AnimalRTPose:
             if pos1[0] == 0 or pos1[1] == 0 or pos2[0] == 0 or pos2[1] == 0:
                 continue
 
-            cv2.line(img,
-                     pos1, pos2,
-                     color=self.skeleton_color_palette[i],
-                     thickness=line_width,
-                     lineType=cv2.LINE_AA
-                     )
-
+            cv2.line(img, pos1, pos2, color=self.skeleton_color_palette[i], thickness=line_width, lineType=cv2.LINE_AA)
 
     def inference(self, frame):
-        """
-        Performs inference using an ONNX model and returns the output image with drawn detections.
+        """Performs inference using an ONNX model and returns the output image with drawn detections.
 
         Returns:
             output_img: The output image with drawn detections.
         """
-
         # Preprocess the image data
         [img, IM], preprocess_time = measure_time(self.preprocess, frame)
 
@@ -308,13 +283,12 @@ class AnimalRTPose:
         # Perform post-processing on the outputs to obtain output image.
         results, postprecess_time = measure_time(self.postprocess, pred, IM)
 
-        results['preprocess_time'] = preprocess_time
-        results['inference_time'] = inference_time
-        results['postprecess_time'] = postprecess_time
-        results['fps'] = 1.0 / (inference_time + postprecess_time + preprocess_time + 1e-7)
+        results["preprocess_time"] = preprocess_time
+        results["inference_time"] = inference_time
+        results["postprecess_time"] = postprecess_time
+        results["fps"] = 1.0 / (inference_time + postprecess_time + preprocess_time + 1e-7)
 
         return results
-
 
     def process_frame(self, frame):
 
@@ -323,11 +297,10 @@ class AnimalRTPose:
 
         results = self.inference(frame)
 
-
-        boxes = results['boxes']
-        keypoints_list = results['keypoints_list']
-        scores = results['scores']
-        class_ids = results['class_ids']
+        boxes = results["boxes"]
+        keypoints_list = results["keypoints_list"]
+        scores = results["scores"]
+        class_ids = results["class_ids"]
 
         if len(boxes) > 0:
             if boxes.ndim == 1:
@@ -346,29 +319,23 @@ class AnimalRTPose:
                     if self.draw_skeleton_action:
                         self.draw_skeleton(frame, keypoints_list[i], line_width=self.line_width)
 
-
         times = {
-            'preprocess_time': 'preprocess: {:.3f} ms'.format(results['preprocess_time'] * 1000.0),
-            'inference_time': 'inference: {:.3f} ms'.format(results['inference_time'] * 1000.0),
-            'postprocess_time': 'postprocess: {:.3f} ms'.format(results['postprecess_time'] * 1000.0),
-            'fps': 'FPS: {:.1f} FPS'.format(results['fps'])
+            "preprocess_time": "preprocess: {:.3f} ms".format(results["preprocess_time"] * 1000.0),
+            "inference_time": "inference: {:.3f} ms".format(results["inference_time"] * 1000.0),
+            "postprocess_time": "postprocess: {:.3f} ms".format(results["postprecess_time"] * 1000.0),
+            "fps": "FPS: {:.1f} FPS".format(results["fps"]),
         }
 
-        cv2.putText(frame, times['fps'], (5, 20),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 255, 0), 1, cv2.LINE_AA)
-        cv2.putText(frame, times['preprocess_time'], (5, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 255, 0), 1, cv2.LINE_AA)
-        cv2.putText(frame, times['inference_time'], (5, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 255, 0), 1, cv2.LINE_AA)
-        cv2.putText(frame, times['postprocess_time'], (5, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 255, 0), 1, cv2.LINE_AA)
+        cv2.putText(frame, times["fps"], (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+        cv2.putText(
+            frame, times["preprocess_time"], (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA
+        )
+        cv2.putText(frame, times["inference_time"], (5, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+        cv2.putText(
+            frame, times["postprocess_time"], (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA
+        )
 
         return frame, results
-
 
     def process_video(self, path):
         cap = cv2.VideoCapture(path)
@@ -376,8 +343,8 @@ class AnimalRTPose:
             ret, frame = cap.read()
             if ret:
                 frame, _ = self.process_frame(frame)
-            cv2.imshow('AnimalRTPose', frame)
-            if cv2.waitKey(30) & 0xFF == ord('q'):
+            cv2.imshow("AnimalRTPose", frame)
+            if cv2.waitKey(30) & 0xFF == ord("q"):
                 break
         cv2.destroyAllWindows()
         cap.release()
@@ -388,41 +355,36 @@ class AnimalRTPose:
         for root, _, files in os.walk(path):
             for file in files:
                 file_path = os.path.join(root, file)
-                if file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
-                    frame, results = self.process_frame(file_path)
+                if file.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
+                    _frame, results = self.process_frame(file_path)
                     count += 1
-                    print('Inference time on {} frame: {:.3f} ms'.format(count,
-                                                                         results['inference_time'] * 1000.0))
-                    inference_time += results['inference_time']
+                    print("Inference time on {} frame: {:.3f} ms".format(count, results["inference_time"] * 1000.0))
+                    inference_time += results["inference_time"]
                     # cv2.imshow('AnimalRTPose', frame)
                     # if cv2.waitKey(1) & 0xFF == ord('q'):
                     #     break
                 else:
-                    print('Only processing images in path. Skipping {}'.format(file_path))
+                    print(f"Only processing images in path. Skipping {file_path}")
         # cv2.destroyAllWindows()
-        print('Average inference time with {} frames: {:.3f} ms'.format(count,
-                                                                        inference_time * 1000.0 / count))
-
-
+        print(f"Average inference time with {count} frames: {inference_time * 1000.0 / count:.3f} ms")
 
     def process_camera(self):
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
-            print('Cannot open camera')
+            print("Cannot open camera")
 
         while True:
             ret, frame = cap.read()
             if not ret:
-                print('Not able to read camera')
+                print("Not able to read camera")
                 break
-            frame, time = self.process_frame(frame)
+            frame, _time = self.process_frame(frame)
 
-            cv2.imshow('AnimalRTPose', frame)
-            if cv2.waitKey(30) & 0xFF == ord('q'):
+            cv2.imshow("AnimalRTPose", frame)
+            if cv2.waitKey(30) & 0xFF == ord("q"):
                 break
         cv2.destroyAllWindows()
         cap.release()
-
 
     def main(self):
 
@@ -433,12 +395,12 @@ class AnimalRTPose:
         self.input_height = 640
 
         if os.path.isfile(self.source):
-            if self.source.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
-                frame, total_times = self.process_frame(self.source)
-                cv2.imshow('AnimalRTPose', frame)
+            if self.source.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
+                frame, _total_times = self.process_frame(self.source)
+                cv2.imshow("AnimalRTPose", frame)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
-            elif self.source.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+            elif self.source.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
                 self.process_video(self.source)
             else:
                 print("Unsupported file type.")
@@ -455,23 +417,23 @@ if __name__ == "__main__":
     parser.add_argument("--source", type=str, default="datasets/animalpose/images/val", help="Path to input image.")
     parser.add_argument("--conf", type=float, default=0.5, help="Confidence threshold")
     parser.add_argument("--iou", type=float, default=0.5, help="NMS IoU threshold")
-    parser.add_argument("--data", type=str, default='configs/data/animalpose.yaml', help="Path to input image.")
+    parser.add_argument("--data", type=str, default="configs/data/animalpose.yaml", help="Path to input image.")
     parser.add_argument("--draw-detections", action="store_true", help="Draw bounding boxes and labels on input image.")
     parser.add_argument("--draw-keypoints", action="store_true", help="Draw bounding boxes and labels on input image.")
     parser.add_argument("--draw-skeleton", action="store_true", help="Draw bounding boxes and labels on input image.")
 
     args = parser.parse_args()
 
-
     # Create an instance of the YOLOv8 class with the specified arguments
-    animalrtpose = AnimalRTPose(args.model,
-                             args.source,
-                             args.conf,
-                             args.iou,
-                             args.data,
-                             args.draw_detections,
-                             args.draw_keypoints,
-                             args.draw_skeleton)
+    animalrtpose = AnimalRTPose(
+        args.model,
+        args.source,
+        args.conf,
+        args.iou,
+        args.data,
+        args.draw_detections,
+        args.draw_keypoints,
+        args.draw_skeleton,
+    )
 
     animalrtpose.main()
-
