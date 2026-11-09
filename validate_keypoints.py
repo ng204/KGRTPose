@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
-"""
-验证 AnimalPose 标签解析格式
-"""
+"""验证 AnimalPose 标签解析格式."""
 
-import cv2
-import numpy as np
 from pathlib import Path
 
-def parse_and_visualize_sample():
-    """解析一个样本标签并可视化"""
+import cv2
 
-    images_dir = Path('/home/ng204/GH/ultralytics+rtmo/datasets/animalpose_yolo/images/test')
-    labels_dir = Path('/home/ng204/GH/ultralytics+rtmo/datasets/animalpose_yolo/labels/test')
+
+def parse_and_visualize_sample():
+    """解析一个样本标签并可视化."""
+    images_dir = Path("/home/ng204/GH/ultralytics+rtmo/datasets/animalpose_yolo/images/test")
+    labels_dir = Path("/home/ng204/GH/ultralytics+rtmo/datasets/animalpose_yolo/labels/test")
 
     # 获取前3张图片进行验证
-    image_files = sorted(list(images_dir.glob('*.jpeg')) + list(images_dir.glob('*.jpg')))[:3]
+    image_files = sorted(list(images_dir.glob("*.jpeg")) + list(images_dir.glob("*.jpg")))[:3]
 
     for img_file in image_files:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Image: {img_file.name}")
 
         # 读取图片
@@ -26,8 +24,8 @@ def parse_and_visualize_sample():
         print(f"Image dimensions: {w}x{h}")
 
         # 读取标签
-        label_file = labels_dir / (img_file.stem + '.txt')
-        with open(label_file, 'r') as f:
+        label_file = labels_dir / (img_file.stem + ".txt")
+        with open(label_file) as f:
             parts = f.read().strip().split()
 
         print(f"Total values in label: {len(parts)}")
@@ -43,7 +41,7 @@ def parse_and_visualize_sample():
 
             bbox = [float(parts[i]) for i in range(1, 5)]
             print(f"BBox (normalized): x={bbox[0]:.3f}, y={bbox[1]:.3f}, w={bbox[2]:.3f}, h={bbox[3]:.3f}")
-            print(f"BBox (pixels): x={bbox[0]*w:.1f}, y={bbox[1]*h:.1f}, w={bbox[2]*w:.1f}, h={bbox[3]*h:.1f}")
+            print(f"BBox (pixels): x={bbox[0] * w:.1f}, y={bbox[1] * h:.1f}, w={bbox[2] * w:.1f}, h={bbox[3] * h:.1f}")
 
             # 解析前5个关键点
             print("\nFirst 5 keypoints:")
@@ -56,20 +54,24 @@ def parse_and_visualize_sample():
                     v = float(parts[idx + 2])
                     keypoints.append((x, y, v))
                     if i < 5:
-                        print(f"  kpt{i}: x={x:.1f}, y={y:.1f}, v={v:.2f} {'✓ valid' if (0 <= x <= w and 0 <= y <= h and v >= 0) else '✗ INVALID'}")
+                        print(
+                            f"  kpt{i}: x={x:.1f}, y={y:.1f}, v={v:.2f} {'✓ valid' if (0 <= x <= w and 0 <= y <= h and v >= 0) else '✗ INVALID'}"
+                        )
 
             # 在图片上绘制前5个关键点
             img_vis = img.copy()
             for idx, (x, y, v) in enumerate(keypoints[:5]):
                 if v > 0:
                     cv2.circle(img_vis, (int(x), int(y)), 5, (0, 255, 0), -1)
-                    cv2.putText(img_vis, str(idx), (int(x)+5, int(y)),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(
+                        img_vis, str(idx), (int(x) + 5, int(y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1
+                    )
 
             # 保存验证图片
-            output_file = Path(f'/tmp/validate_{img_file.stem}.jpg')
+            output_file = Path(f"/tmp/validate_{img_file.stem}.jpg")
             cv2.imwrite(str(output_file), img_vis)
             print(f"\nVisualization saved to: {output_file}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     parse_and_visualize_sample()
