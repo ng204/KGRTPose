@@ -5,24 +5,21 @@ from __future__ import annotations
 from typing import Any
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from ultralytics.utils.metrics import bbox_iou
-from ultralytics.utils.metrics import OKS_SIGMA
 from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
+from ultralytics.utils.pose_cfg import GetOKSSigma
 from ultralytics.utils.tal import RotatedTaskAlignedAssigner, TaskAlignedAssigner, dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.torch_utils import autocast
 
 from .metrics import bbox_iou, probiou
 from .tal import bbox2dist
 
-from ultralytics.utils.pose_cfg import GetOKSSigma
-
 
 class VarifocalLoss(nn.Module):
-    """
-    Varifocal loss by Zhang et al.
+    """Varifocal loss by Zhang et al.
 
     Implements the Varifocal Loss function for addressing class imbalance in object detection by focusing on
     hard-to-classify examples and balancing positive/negative samples.
@@ -54,11 +51,10 @@ class VarifocalLoss(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    """
-    Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5).
+    """Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5).
 
-    Implements the Focal Loss function for addressing class imbalance by down-weighting easy examples and focusing
-    on hard negatives during training.
+    Implements the Focal Loss function for addressing class imbalance by down-weighting easy examples and focusing on
+    hard negatives during training.
 
     Attributes:
         gamma (float): The focusing parameter that controls how much the loss focuses on hard-to-classify examples.
@@ -108,7 +104,6 @@ class DFLoss(nn.Module):
             F.cross_entropy(pred_dist, tl.view(-1), reduction="none").view(tl.shape) * wl
             + F.cross_entropy(pred_dist, tr.view(-1), reduction="none").view(tl.shape) * wr
         ).mean(-1, keepdim=True)
-
 
 
 class BboxLoss(nn.Module):
@@ -196,13 +191,11 @@ class KeypointLoss(nn.Module):
         e = d / ((2 * self.sigmas).pow(2) * (area + 1e-9) * 2)  # from cocoeval
         return (kpt_loss_factor.view(-1, 1) * ((1 - torch.exp(-e)) * kpt_mask)).mean()
 
-class RLEKeypointLoss(nn.Module):
-    """
-    残差对数似然估计（RLE）关键点损失。
-    Reference: "Human Pose Regression with Residual Log-likelihood Estimation" (ICCV 2021)
 
-    pred_kpts 每个关键点输出 5 个值：[x, y, vis, log_sx, log_sy]
-    训练时使用 x,y,log_sx,log_sy 计算 NLL；vis 通道由 bce_pose 单独处理（不变）。
+class RLEKeypointLoss(nn.Module):
+    """残差对数似然估计（RLE）关键点损失。 Reference: "Human Pose Regression with Residual Log-likelihood Estimation" (ICCV 2021).
+
+    pred_kpts 每个关键点输出 5 个值：[x, y, vis, log_sx, log_sy] 训练时使用 x,y,log_sx,log_sy 计算 NLL；vis 通道由 bce_pose 单独处理（不变）。
     """
 
     def __init__(self, loss_type: str = "laplace"):
@@ -211,21 +204,21 @@ class RLEKeypointLoss(nn.Module):
 
     def forward(
         self,
-        pred_kpts: torch.Tensor,   # (M, nk, 5): [x, y, vis, log_sx, log_sy]
-        gt_kpts: torch.Tensor,     # (M, nk, 3): [x, y, vis]  (stride-scaled)
-        kpt_mask: torch.Tensor,    # (M, nk) bool
+        pred_kpts: torch.Tensor,  # (M, nk, 5): [x, y, vis, log_sx, log_sy]
+        gt_kpts: torch.Tensor,  # (M, nk, 3): [x, y, vis]  (stride-scaled)
+        kpt_mask: torch.Tensor,  # (M, nk) bool
     ) -> torch.Tensor:
-        xy_pred = pred_kpts[..., :2]              # (M, nk, 2)
+        xy_pred = pred_kpts[..., :2]  # (M, nk, 2)
         ndim = pred_kpts.shape[-1]
         if ndim >= 5:
-            log_sigma = pred_kpts[..., 3:5]       # (M, nk, 2)，跳过 vis(index 2)
+            log_sigma = pred_kpts[..., 3:5]  # (M, nk, 2)，跳过 vis(index 2)
             sigma = torch.exp(log_sigma).clamp(min=1e-3, max=10.0)
         else:
             # fallback：pred_kpt 维度不足5（如加载旧checkpoint），使用固定sigma=1
             sigma = torch.ones_like(xy_pred)
 
-        xy_gt = gt_kpts[..., :2]                  # (M, nk, 2)
-        residual = (xy_pred - xy_gt).abs()        # (M, nk, 2)
+        xy_gt = gt_kpts[..., :2]  # (M, nk, 2)
+        residual = (xy_pred - xy_gt).abs()  # (M, nk, 2)
 
         if self.loss_type == "laplace":
             nll = residual / sigma + torch.log(2.0 * sigma)
@@ -238,6 +231,7 @@ class RLEKeypointLoss(nn.Module):
 
 class SimCCKptLoss(nn.Module):
     """SimCC coordinate classification loss for keypoints (RTMO++ style)."""
+
     def __init__(self, bins: int = 64, eps: float = 1e-8):
         """Initialize SimCC loss with discretization bins."""
         super().__init__()
@@ -245,37 +239,35 @@ class SimCCKptLoss(nn.Module):
         self.eps = eps
 
     def forward(self, pred_kpts: torch.Tensor, gt_kpts: torch.Tensor, kpt_mask: torch.Tensor) -> torch.Tensor:
-        """
-        Compute SimCC loss.
+        """Compute SimCC loss.
+
         Args:
-            pred_kpts: (N, nk, 2*bins)  # RTMO++ Head 输出
-            gt_kpts:   (N, nk, 3)       # [x, y, vis]，坐标需为 [0,1] 归一化值
-            kpt_mask:  (N, nk)          # 可见性布尔掩码
+            pred_kpts: (N, nk, 2*bins) # RTMO++ Head 输出
+            gt_kpts: (N, nk, 3) # [x, y, vis]，坐标需为 [0,1] 归一化值
+            kpt_mask: (N, nk) # 可见性布尔掩码.
         """
-        nk = gt_kpts.shape[1]
+        gt_kpts.shape[1]
         # 分离 x/y 预测并展平为 (N*nk, bins)
-        pred_x = pred_kpts[:, :, :self.bins].reshape(-1, self.bins)
-        pred_y = pred_kpts[:, :, self.bins:].reshape(-1, self.bins)
+        pred_x = pred_kpts[:, :, : self.bins].reshape(-1, self.bins)
+        pred_y = pred_kpts[:, :, self.bins :].reshape(-1, self.bins)
 
         # GT 坐标离散化到 [0, bins-1]
         gt_x = (gt_kpts[:, :, 0] * self.bins).clamp(0, self.bins - 1 - self.eps).long().reshape(-1)
         gt_y = (gt_kpts[:, :, 1] * self.bins).clamp(0, self.bins - 1 - self.eps).long().reshape(-1)
         mask = kpt_mask.reshape(-1)
 
-        loss_x = F.cross_entropy(pred_x, gt_x, reduction='none') * mask
-        loss_y = F.cross_entropy(pred_y, gt_y, reduction='none') * mask
+        loss_x = F.cross_entropy(pred_x, gt_x, reduction="none") * mask
+        loss_y = F.cross_entropy(pred_y, gt_y, reduction="none") * mask
         return (loss_x + loss_y).sum() / max(mask.sum(), 1)
 
+
 class BoneSymmetryLoss(nn.Module):
-    """
-    骨骼对称约束 loss。
+    """骨骼对称约束 loss。.
 
-    对于左右对称的骨骼对（由 flip_idx 推导），惩罚预测长度的不对称性。
-    不依赖 GT 坐标，只作用于预测值，是 keypoint location loss 的互补约束：
-    keypoint loss 驱动预测接近 GT，本 loss 鼓励模型输出解剖学上对称的姿态。
+    对于左右对称的骨骼对（由 flip_idx 推导），惩罚预测长度的不对称性。 不依赖 GT 坐标，只作用于预测值，是 keypoint location loss 的互补约束： keypoint loss 驱动预测接近 GT，本
+    loss 鼓励模型输出解剖学上对称的姿态。
 
-    sym_pairs 由 train.py 在训练开始前通过 set_sym_pairs() 注入，
-    格式为 [((i, j), (k, l)), ...]，表示骨骼 [i,j] 与骨骼 [k,l] 是对称对。
+    sym_pairs 由 train.py 在训练开始前通过 set_sym_pairs() 注入， 格式为 [((i, j), (k, l)), ...]，表示骨骼 [i,j] 与骨骼 [k,l] 是对称对。
     """
 
     def __init__(self):
@@ -286,12 +278,11 @@ class BoneSymmetryLoss(nn.Module):
         self.sym_pairs = sym_pairs
 
     def forward(self, pred_kpts: torch.Tensor, kpt_mask: torch.Tensor) -> torch.Tensor:
-        """
-        计算骨骼对称 loss。
+        """计算骨骼对称 loss。.
 
         Args:
-            pred_kpts: (N, nk, ndim)  预测关键点，坐标为像素值
-            kpt_mask:  (N, nk)        可见性布尔掩码（来自 GT）
+            pred_kpts: (N, nk, ndim) 预测关键点，坐标为像素值
+            kpt_mask: (N, nk) 可见性布尔掩码（来自 GT）
 
         Returns:
             标量 loss
@@ -312,9 +303,7 @@ class BoneSymmetryLoss(nn.Module):
             # 相对不对称度（无量纲，scale-invariant）
             rel_asym = (len1 - len2).abs() / (len1 + len2 + 1e-3)
             # Huber loss：10% 以内的不对称不惩罚（动物自然姿态容差）
-            total_loss = total_loss + F.huber_loss(
-                rel_asym, torch.zeros_like(rel_asym), delta=0.1, reduction="sum"
-            )
+            total_loss = total_loss + F.huber_loss(rel_asym, torch.zeros_like(rel_asym), delta=0.1, reduction="sum")
             n_valid += mask.sum().item()
 
         return total_loss / max(n_valid, 1)
@@ -521,8 +510,7 @@ class v8SegmentationLoss(v8DetectionLoss):
     def single_mask_loss(
         gt_mask: torch.Tensor, pred: torch.Tensor, proto: torch.Tensor, xyxy: torch.Tensor, area: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Compute the instance segmentation loss for a single image.
+        """Compute the instance segmentation loss for a single image.
 
         Args:
             gt_mask (torch.Tensor): Ground truth mask of shape (N, H, W), where N is the number of objects.
@@ -554,8 +542,7 @@ class v8SegmentationLoss(v8DetectionLoss):
         imgsz: torch.Tensor,
         overlap: bool,
     ) -> torch.Tensor:
-        """
-        Calculate the loss for instance segmentation.
+        """Calculate the loss for instance segmentation.
 
         Args:
             fg_mask (torch.Tensor): A binary tensor of shape (BS, N_anchors) indicating which anchors are positive.
@@ -620,7 +607,7 @@ class v8PoseLoss(v8DetectionLoss):
         # is_pose = self.kpt_shape == [17, 3]
         # nkpt = self.kpt_shape[0]  # number of keypoints
         # sigmas = torch.from_numpy(OKS_SIGMA).to(self.device) if is_pose else torch.ones(nkpt, device=self.device) / nkpt
-        sigmas = torch.from_numpy(GetOKSSigma()).to(self.device)
+        torch.from_numpy(GetOKSSigma()).to(self.device)
         self.keypoint_loss = RLEKeypointLoss(loss_type="laplace")
 
         # 骨骼对称约束 loss
@@ -630,6 +617,7 @@ class v8PoseLoss(v8DetectionLoss):
             self.skeleton = head.skeleton
         else:
             from ultralytics.utils.pose_cfg import GetSkeleton
+
             self.skeleton = GetSkeleton()
         nk = self.kpt_shape[0]
         if not self.skeleton:
@@ -641,7 +629,7 @@ class v8PoseLoss(v8DetectionLoss):
         self._sym_pairs_ready = False  # 标记是否已注入对称骨骼对
 
     def set_sym_pairs(self, sym_pairs: list):
-        """由 train.py 在训练开始前调用，注入从 flip_idx 推导出的对称骨骼对。"""
+        """由 train.py 在训练开始前调用，注入从 flip_idx 推导出的对称骨骼对。."""
         self.bone_loss.set_sym_pairs(sym_pairs)
         self._sym_pairs_ready = len(sym_pairs) > 0
 
@@ -717,24 +705,22 @@ class v8PoseLoss(v8DetectionLoss):
                         continue
                     gt_idx_i = target_gt_idx[bi][mask_i]
                     kpts_in_batch = keypoints[batch_idx.view(-1) == bi]  # (n_gt_i, nk, ndim)
-                    gt_kpts_i = kpts_in_batch[gt_idx_i]                  # (M, nk, ndim)
-                    pred_kpts_i = pred_kpts[bi][mask_i]                  # (M, nk, ndim)
+                    gt_kpts_i = kpts_in_batch[gt_idx_i]  # (M, nk, ndim)
+                    pred_kpts_i = pred_kpts[bi][mask_i]  # (M, nk, ndim)
                     # 可见性掩码（来自 GT，用于过滤不可见端点）
                     if gt_kpts_i.shape[-1] == 3:
-                        kpt_mask_i = (gt_kpts_i[..., 2] != 0) | (
-                            (gt_kpts_i[..., 0] != 0) | (gt_kpts_i[..., 1] != 0)
-                        )
+                        kpt_mask_i = (gt_kpts_i[..., 2] != 0) | ((gt_kpts_i[..., 0] != 0) | (gt_kpts_i[..., 1] != 0))
                     else:
                         kpt_mask_i = torch.ones(gt_kpts_i.shape[:2], dtype=torch.bool, device=self.device)
                     bone_loss_val = bone_loss_val + self.bone_loss(pred_kpts_i, kpt_mask_i)
                     n_fg += 1
                 loss[5] = bone_loss_val / max(n_fg, 1)
 
-        loss[0] *= self.hyp.box   # box gain
+        loss[0] *= self.hyp.box  # box gain
         loss[1] *= self.hyp.pose  # pose gain
         loss[2] *= self.hyp.kobj  # kobj gain
-        loss[3] *= self.hyp.cls   # cls gain
-        loss[4] *= self.hyp.dfl   # dfl gain
+        loss[3] *= self.hyp.cls  # cls gain
+        loss[4] *= self.hyp.dfl  # dfl gain
         loss[5] *= getattr(self.hyp, "bone", 0.02)  # bone length gain（默认 0.02，相对误差+Huber 后无需大权重）
 
         return loss * batch_size, loss.detach()  # loss(box, kpt, kobj, cls, dfl, bone)
@@ -758,8 +744,7 @@ class v8PoseLoss(v8DetectionLoss):
         target_bboxes: torch.Tensor,
         pred_kpts: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Calculate the keypoints loss for the model.
+        """Calculate the keypoints loss for the model.
 
         This function calculates the keypoints loss and keypoints object loss for a given batch. The keypoints loss is
         based on the difference between the predicted keypoints and ground truth keypoints. The keypoints object loss is
@@ -811,7 +796,7 @@ class v8PoseLoss(v8DetectionLoss):
 
         if masks.any():
             gt_kpt = selected_keypoints[masks]
-            area = xyxy2xywh(target_bboxes[masks])[:, 2:].prod(1, keepdim=True)
+            xyxy2xywh(target_bboxes[masks])[:, 2:].prod(1, keepdim=True)
             pred_kpt = pred_kpts[masks]
             if gt_kpt.shape[-1] == 3:
                 # For datasets with visibility (0=missing, 1/2=labeled): use visibility mask.
@@ -940,8 +925,7 @@ class v8OBBLoss(v8DetectionLoss):
     def bbox_decode(
         self, anchor_points: torch.Tensor, pred_dist: torch.Tensor, pred_angle: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Decode predicted object bounding box coordinates from anchor points and distribution.
+        """Decode predicted object bounding box coordinates from anchor points and distribution.
 
         Args:
             anchor_points (torch.Tensor): Anchor points, (h*w, 2).
