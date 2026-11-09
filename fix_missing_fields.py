@@ -2,32 +2,33 @@
 """
 修复缺少class_id和bbox的标注文件
 格式：应该是 class_id x1 y1 x2 y2 kpt0_x kpt0_y kpt0_vis ... kpt5_x kpt5_y kpt5_vis
-但0001.txt等文件缺少前5个字段
+但0001.txt等文件缺少前5个字段.
 """
-import os
+
 from pathlib import Path
 
+
 def fix_missing_fields():
-    dataset_root = Path('datasets/animalpose')
+    dataset_root = Path("datasets/animalpose")
 
-    print("="*80)
+    print("=" * 80)
     print("🔧 修复缺少class_id和bbox的标注文件")
-    print("="*80)
+    print("=" * 80)
 
-    stats = {'files_fixed': 0, 'annotations_fixed': 0}
+    stats = {"files_fixed": 0, "annotations_fixed": 0}
 
-    for split in ['train', 'val', 'test']:
-        lab_dir = dataset_root / 'labels' / split
+    for split in ["train", "val", "test"]:
+        lab_dir = dataset_root / "labels" / split
         if not lab_dir.exists():
             continue
 
         print(f"\n🔍 处理 {split.upper()} 集合...")
 
-        label_files = sorted(lab_dir.glob('*.txt'))
+        label_files = sorted(lab_dir.glob("*.txt"))
 
         for label_file in label_files:
             try:
-                with open(label_file, 'r') as f:
+                with open(label_file) as f:
                     lines = f.readlines()
 
                 if not lines:
@@ -52,7 +53,7 @@ def fix_missing_fields():
 
                         kpts = []
                         for i in range(0, 18, 3):
-                            kpts.append((float(parts[i]), float(parts[i+1])))
+                            kpts.append((float(parts[i]), float(parts[i + 1])))
 
                         # 计算关键点的包围盒
                         xs = [kpt[0] for kpt in kpts]
@@ -73,7 +74,7 @@ def fix_missing_fields():
                         # 重构行
                         fixed_line = f"0 {x_min:.6f} {y_min:.6f} {x_max:.6f} {y_max:.6f} {' '.join(parts)}\n"
                         fixed_lines.append(fixed_line)
-                        stats['annotations_fixed'] += 1
+                        stats["annotations_fixed"] += 1
                         file_modified = True
                     elif len(parts) == 23:
                         # 已经是正确格式
@@ -84,20 +85,21 @@ def fix_missing_fields():
 
                 # 写回文件
                 if file_modified:
-                    with open(label_file, 'w') as f:
+                    with open(label_file, "w") as f:
                         f.writelines(fixed_lines)
-                    stats['files_fixed'] += 1
+                    stats["files_fixed"] += 1
 
             except Exception as e:
                 print(f"  ⚠️  处理 {label_file.name} 失败: {e}")
 
     # 打印统计
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("✅ 修复完成！")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print(f"修复的文件数: {stats['files_fixed']}")
     print(f"修复的标注数: {stats['annotations_fixed']}")
-    print(f"\n💾 修复后的文件已保存")
+    print("\n💾 修复后的文件已保存")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     fix_missing_fields()
