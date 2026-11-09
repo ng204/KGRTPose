@@ -21,8 +21,10 @@ Revision History:
 
 import numpy as np
 
-OKS_SIGMA_USER = np.array([0.246, 0.182, 0.184, 0.189, 0.190, 0.252])  # fish 6-kpt, derived from training data distribution
-SKELETON_USER =   [
+OKS_SIGMA_USER = np.array(
+    [0.246, 0.182, 0.184, 0.189, 0.190, 0.252]
+)  # fish 6-kpt, derived from training data distribution
+SKELETON_USER = [
     [15, 13],
     [13, 11],
     [16, 14],
@@ -42,24 +44,28 @@ SKELETON_USER =   [
     [2, 4],
     [3, 5],
     [4, 6],
-  ]
+]
 
 
 def GetOKSSigma():
     global OKS_SIGMA_USER
     return OKS_SIGMA_USER
 
+
 def SetOKSSigma(sigma):
     global OKS_SIGMA_USER
     OKS_SIGMA_USER = np.array(sigma)
+
 
 def SetDefaultOKSSigma(kpt_nums):
     global OKS_SIGMA_USER
     OKS_SIGMA_USER = np.array([1.0 / kpt_nums] * kpt_nums)
 
+
 def GetSkeleton():
     global SKELETON_USER
     return SKELETON_USER
+
 
 def SetSkeleton(skeleton):
     global SKELETON_USER
@@ -82,8 +88,7 @@ def GetFishSkeleton():
 
 
 def compute_bone_length_stats(label_keypoints, skeleton):
-    """
-    从 GT 关键点数组计算每根骨骼的长度均值和标准差。
+    """从 GT 关键点数组计算每根骨骼的长度均值和标准差。.
 
     Args:
         label_keypoints: (N, nk_pts, ndim) numpy array，坐标单位需一致
@@ -91,7 +96,7 @@ def compute_bone_length_stats(label_keypoints, skeleton):
 
     Returns:
         means: (n_bones,) ndarray
-        stds:  (n_bones,) ndarray，最小值 1e-3
+        stds: (n_bones,) ndarray，最小值 1e-3
     """
     means, stds = [], []
     for i, j in skeleton:
@@ -100,13 +105,10 @@ def compute_bone_length_stats(label_keypoints, skeleton):
         if label_keypoints.shape[2] == 3:
             vis_i = label_keypoints[:, i, 2]
             vis_j = label_keypoints[:, j, 2]
-            valid = ((vis_i > 0) | ((kp_i[:, 0] != 0) | (kp_i[:, 1] != 0)))
-            valid &= ((vis_j > 0) | ((kp_j[:, 0] != 0) | (kp_j[:, 1] != 0)))
+            valid = (vis_i > 0) | ((kp_i[:, 0] != 0) | (kp_i[:, 1] != 0))
+            valid &= (vis_j > 0) | ((kp_j[:, 0] != 0) | (kp_j[:, 1] != 0))
         else:
-            valid = (
-                ((kp_i[:, 0] != 0) | (kp_i[:, 1] != 0)) &
-                ((kp_j[:, 0] != 0) | (kp_j[:, 1] != 0))
-            )
+            valid = ((kp_i[:, 0] != 0) | (kp_i[:, 1] != 0)) & ((kp_j[:, 0] != 0) | (kp_j[:, 1] != 0))
         if valid.sum() < 2:
             means.append(1.0)
             stds.append(1.0)
