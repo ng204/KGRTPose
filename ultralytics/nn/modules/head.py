@@ -7,12 +7,11 @@ import copy
 import math
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.init import constant_, xavier_uniform_
 
-from ultralytics.nn.modules import Conv
-from ultralytics.nn.modules import DFL
+from ultralytics.nn.modules import DFL, Conv
 from ultralytics.utils import NOT_MACOS14
 from ultralytics.utils.tal import TORCH_1_10, dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.torch_utils import fuse_conv_and_bn, smart_inference_mode
@@ -22,12 +21,22 @@ from .conv import Conv, DWConv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "Detect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder", "v10Detect", "YOLOEDetect", "YOLOESegment","PoseRTMO"
+__all__ = (
+    "OBB",
+    "Classify",
+    "Detect",
+    "Pose",
+    "PoseRTMO",
+    "RTDETRDecoder",
+    "Segment",
+    "YOLOEDetect",
+    "YOLOESegment",
+    "v10Detect",
+)
 
 
 class Detect(nn.Module):
-    """
-    YOLO Detect head for object detection models.
+    """YOLO Detect head for object detection models.
 
     This class implements the detection head used in YOLO models for predicting bounding boxes and class probabilities.
     It supports both training and inference modes, with optional end-to-end detection capabilities.
@@ -80,8 +89,7 @@ class Detect(nn.Module):
     xyxy = False  # xyxy or xywh output
 
     def __init__(self, nc: int = 80, ch: tuple = ()):
-        """
-        Initialize the YOLO detection layer with specified number of classes and channels.
+        """Initialize the YOLO detection layer with specified number of classes and channels.
 
         Args:
             nc (int): Number of classes.
@@ -128,15 +136,14 @@ class Detect(nn.Module):
         return y if self.export else (y, x)
 
     def forward_end2end(self, x: list[torch.Tensor]) -> dict | tuple:
-        """
-        Perform forward pass of the v10Detect module.
+        """Perform forward pass of the v10Detect module.
 
         Args:
             x (List[torch.Tensor]): Input feature maps from different levels.
 
         Returns:
-            outputs (dict | tuple): Training mode returns dict with one2many and one2one outputs.
-                Inference mode returns processed detections or tuple with detections and raw outputs.
+            outputs (dict | tuple): Training mode returns dict with one2many and one2one outputs. Inference mode returns
+                processed detections or tuple with detections and raw outputs.
         """
         x_detach = [xi.detach() for xi in x]
         one2one = [
@@ -152,8 +159,7 @@ class Detect(nn.Module):
         return y if self.export else (y, {"one2many": x, "one2one": one2one})
 
     def _inference(self, x: list[torch.Tensor]) -> torch.Tensor:
-        """
-        Decode predicted bounding boxes and class probabilities based on multiple-level feature maps.
+        """Decode predicted bounding boxes and class probabilities based on multiple-level feature maps.
 
         Args:
             x (List[torch.Tensor]): List of feature maps from different detection layers.
@@ -212,8 +218,7 @@ class Detect(nn.Module):
 
     @staticmethod
     def postprocess(preds: torch.Tensor, max_det: int, nc: int = 80) -> torch.Tensor:
-        """
-        Post-process YOLO model predictions.
+        """Post-process YOLO model predictions.
 
         Args:
             preds (torch.Tensor): Raw predictions with shape (batch_size, num_anchors, 4 + nc) with last dimension
@@ -236,8 +241,7 @@ class Detect(nn.Module):
 
 
 class Segment(Detect):
-    """
-    YOLO Segment head for segmentation models.
+    """YOLO Segment head for segmentation models.
 
     This class extends the Detect head to include mask prediction capabilities for instance segmentation tasks.
 
@@ -258,8 +262,7 @@ class Segment(Detect):
     """
 
     def __init__(self, nc: int = 80, nm: int = 32, npr: int = 256, ch: tuple = ()):
-        """
-        Initialize the YOLO model attributes such as the number of masks, prototypes, and the convolution layers.
+        """Initialize the YOLO model attributes such as the number of masks, prototypes, and the convolution layers.
 
         Args:
             nc (int): Number of classes.
@@ -288,8 +291,7 @@ class Segment(Detect):
 
 
 class OBB(Detect):
-    """
-    YOLO OBB detection head for detection with rotation models.
+    """YOLO OBB detection head for detection with rotation models.
 
     This class extends the Detect head to include oriented bounding box prediction with rotation angles.
 
@@ -310,8 +312,7 @@ class OBB(Detect):
     """
 
     def __init__(self, nc: int = 80, ne: int = 1, ch: tuple = ()):
-        """
-        Initialize OBB with number of classes `nc` and layer channels `ch`.
+        """Initialize OBB with number of classes `nc` and layer channels `ch`.
 
         Args:
             nc (int): Number of classes.
@@ -344,8 +345,7 @@ class OBB(Detect):
 
 
 class Pose(Detect):
-    """
-    YOLO Pose head for keypoints models.
+    """YOLO Pose head for keypoints models.
 
     This class extends the Detect head to include keypoint prediction capabilities for pose estimation tasks.
 
@@ -366,8 +366,7 @@ class Pose(Detect):
     """
 
     def __init__(self, nc: int = 80, kpt_shape: tuple = (17, 3), ch: tuple = ()):
-        """
-        Initialize YOLO network with default parameters and Convolutional Layers.
+        """Initialize YOLO network with default parameters and Convolutional Layers.
 
         Args:
             nc (int): Number of classes.
@@ -427,8 +426,7 @@ class Pose(Detect):
 
 
 class Classify(nn.Module):
-    """
-    YOLO classification head, i.e. x(b,c1,20,20) to x(b,c2).
+    """YOLO classification head, i.e. x(b,c1,20,20) to x(b,c2).
 
     This class implements a classification head that transforms feature maps into class predictions.
 
@@ -452,8 +450,7 @@ class Classify(nn.Module):
     export = False  # export mode
 
     def __init__(self, c1: int, c2: int, k: int = 1, s: int = 1, p: int | None = None, g: int = 1):
-        """
-        Initialize YOLO classification head to transform input tensor from (b,c1,20,20) to (b,c2) shape.
+        """Initialize YOLO classification head to transform input tensor from (b,c1,20,20) to (b,c2) shape.
 
         Args:
             c1 (int): Number of input channels.
@@ -482,11 +479,10 @@ class Classify(nn.Module):
 
 
 class WorldDetect(Detect):
-    """
-    Head for integrating YOLO detection models with semantic understanding from text embeddings.
+    """Head for integrating YOLO detection models with semantic understanding from text embeddings.
 
-    This class extends the standard Detect head to incorporate text embeddings for enhanced semantic understanding
-    in object detection tasks.
+    This class extends the standard Detect head to incorporate text embeddings for enhanced semantic understanding in
+    object detection tasks.
 
     Attributes:
         cv3 (nn.ModuleList): Convolution layers for embedding features.
@@ -505,8 +501,7 @@ class WorldDetect(Detect):
     """
 
     def __init__(self, nc: int = 80, embed: int = 512, with_bn: bool = False, ch: tuple = ()):
-        """
-        Initialize YOLO detection layer with nc classes and layer channels ch.
+        """Initialize YOLO detection layer with nc classes and layer channels ch.
 
         Args:
             nc (int): Number of classes.
@@ -540,11 +535,10 @@ class WorldDetect(Detect):
 
 
 class LRPCHead(nn.Module):
-    """
-    Lightweight Region Proposal and Classification Head for efficient object detection.
+    """Lightweight Region Proposal and Classification Head for efficient object detection.
 
-    This head combines region proposal filtering with classification to enable efficient detection with
-    dynamic vocabulary support.
+    This head combines region proposal filtering with classification to enable efficient detection with dynamic
+    vocabulary support.
 
     Attributes:
         vocab (nn.Module): Vocabulary/classification layer.
@@ -565,8 +559,7 @@ class LRPCHead(nn.Module):
     """
 
     def __init__(self, vocab: nn.Module, pf: nn.Module, loc: nn.Module, enabled: bool = True):
-        """
-        Initialize LRPCHead with vocabulary, proposal filter, and localization components.
+        """Initialize LRPCHead with vocabulary, proposal filter, and localization components.
 
         Args:
             vocab (nn.Module): Vocabulary/classification module.
@@ -605,8 +598,7 @@ class LRPCHead(nn.Module):
 
 
 class YOLOEDetect(Detect):
-    """
-    Head for integrating YOLO detection models with semantic understanding from text embeddings.
+    """Head for integrating YOLO detection models with semantic understanding from text embeddings.
 
     This class extends the standard Detect head to support text-guided detection with enhanced semantic understanding
     through text embeddings and visual prompt embeddings.
@@ -638,8 +630,7 @@ class YOLOEDetect(Detect):
     is_fused = False
 
     def __init__(self, nc: int = 80, embed: int = 512, with_bn: bool = False, ch: tuple = ()):
-        """
-        Initialize YOLO detection layer with nc classes and layer channels ch.
+        """Initialize YOLO detection layer with nc classes and layer channels ch.
 
         Args:
             nc (int): Number of classes.
@@ -793,11 +784,10 @@ class YOLOEDetect(Detect):
 
 
 class YOLOESegment(YOLOEDetect):
-    """
-    YOLO segmentation head with text embedding capabilities.
+    """YOLO segmentation head with text embedding capabilities.
 
-    This class extends YOLOEDetect to include mask prediction capabilities for instance segmentation tasks
-    with text-guided semantic understanding.
+    This class extends YOLOEDetect to include mask prediction capabilities for instance segmentation tasks with
+    text-guided semantic understanding.
 
     Attributes:
         nm (int): Number of masks.
@@ -819,8 +809,7 @@ class YOLOESegment(YOLOEDetect):
     def __init__(
         self, nc: int = 80, nm: int = 32, npr: int = 256, embed: int = 512, with_bn: bool = False, ch: tuple = ()
     ):
-        """
-        Initialize YOLOESegment with class count, mask parameters, and embedding dimensions.
+        """Initialize YOLOESegment with class count, mask parameters, and embedding dimensions.
 
         Args:
             nc (int): Number of classes.
@@ -861,8 +850,7 @@ class YOLOESegment(YOLOEDetect):
 
 
 class RTDETRDecoder(nn.Module):
-    """
-    Real-Time Deformable Transformer Decoder (RTDETRDecoder) module for object detection.
+    """Real-Time Deformable Transformer Decoder (RTDETRDecoder) module for object detection.
 
     This decoder module utilizes Transformer architecture along with deformable convolutions to predict bounding boxes
     and class labels for objects in an image. It integrates features from multiple layers and runs through a series of
@@ -922,8 +910,7 @@ class RTDETRDecoder(nn.Module):
         box_noise_scale: float = 1.0,
         learnt_init_query: bool = False,
     ):
-        """
-        Initialize the RTDETRDecoder module with the given parameters.
+        """Initialize the RTDETRDecoder module with the given parameters.
 
         Args:
             nc (int): Number of classes.
@@ -983,8 +970,7 @@ class RTDETRDecoder(nn.Module):
         self._reset_parameters()
 
     def forward(self, x: list[torch.Tensor], batch: dict | None = None) -> tuple | torch.Tensor:
-        """
-        Run the forward pass of the module, returning bounding box and classification scores for the input.
+        """Run the forward pass of the module, returning bounding box and classification scores for the input.
 
         Args:
             x (List[torch.Tensor]): List of feature maps from the backbone.
@@ -1040,8 +1026,7 @@ class RTDETRDecoder(nn.Module):
         device: str = "cpu",
         eps: float = 1e-2,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Generate anchor bounding boxes for given shapes with specific grid size and validate them.
+        """Generate anchor bounding boxes for given shapes with specific grid size and validate them.
 
         Args:
             shapes (list): List of feature map shapes.
@@ -1073,8 +1058,7 @@ class RTDETRDecoder(nn.Module):
         return anchors, valid_mask
 
     def _get_encoder_input(self, x: list[torch.Tensor]) -> tuple[torch.Tensor, list[list[int]]]:
-        """
-        Process and return encoder inputs by getting projection features from input and concatenating them.
+        """Process and return encoder inputs by getting projection features from input and concatenating them.
 
         Args:
             x (List[torch.Tensor]): List of feature maps from the backbone.
@@ -1106,8 +1090,7 @@ class RTDETRDecoder(nn.Module):
         dn_embed: torch.Tensor | None = None,
         dn_bbox: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Generate and prepare the input required for the decoder from the provided features and shapes.
+        """Generate and prepare the input required for the decoder from the provided features and shapes.
 
         Args:
             feats (torch.Tensor): Processed features from encoder.
@@ -1183,11 +1166,10 @@ class RTDETRDecoder(nn.Module):
 
 
 class v10Detect(Detect):
-    """
-    v10 Detection head from https://arxiv.org/pdf/2405.14458.
+    """v10 Detection head from https://arxiv.org/pdf/2405.14458.
 
-    This class implements the YOLOv10 detection head with dual-assignment training and consistent dual predictions
-    for improved efficiency and performance.
+    This class implements the YOLOv10 detection head with dual-assignment training and consistent dual predictions for
+    improved efficiency and performance.
 
     Attributes:
         end2end (bool): End-to-end detection mode.
@@ -1211,8 +1193,7 @@ class v10Detect(Detect):
     end2end = True
 
     def __init__(self, nc: int = 80, ch: tuple = ()):
-        """
-        Initialize the v10Detect object with the specified number of classes and input channels.
+        """Initialize the v10Detect object with the specified number of classes and input channels.
 
         Args:
             nc (int): Number of classes.
@@ -1235,10 +1216,13 @@ class v10Detect(Detect):
         """Remove the one2many head for inference optimization."""
         self.cv2 = self.cv3 = nn.ModuleList([nn.Identity()] * self.nl)
 
+
 # /home/ng204/GH/ultralytics+rtmo/ultralytics/nn/modules/head.py
 
+
 class PoseRTMO(nn.Module):
-    """YOLOv8 兼容姿态头（支持 training/inference 双模式）"""
+    """YOLOv8 兼容姿态头（支持 training/inference 双模式）."""
+
     dynamic = False
     export = False
 
@@ -1251,7 +1235,7 @@ class PoseRTMO(nn.Module):
         self.no = self.reg_max * 4 + self.nc
         self.nl = len(ch) if ch else 3
         self.stride = torch.zeros(self.nl)
-        self.shape = None          # cache for inference anchor computation
+        self.shape = None  # cache for inference anchor computation
         self.anchors = torch.empty(0)
         self.strides = torch.empty(0)
         self.inplace = True
@@ -1274,16 +1258,14 @@ class PoseRTMO(nn.Module):
         # Skeleton-Topology Graph Refinement (STGR)
         self.graph_refine = None
         if graph_refine:
-            self.graph_refine = SkeletonGraphRefine(
-                num_keypoints=self.kpt_shape[0], ndim=self.kpt_shape[1]
-            )
+            self.graph_refine = SkeletonGraphRefine(num_keypoints=self.kpt_shape[0], ndim=self.kpt_shape[1])
 
     def bias_init(self):
         """Initialize biases for box and cls+kpt branches."""
         for cv2_layer, s in zip(self.cv2, self.stride):
             cv2_layer[-1].bias.data[:] = 1.0  # box
         for cv3_layer, s in zip(self.cv3, self.stride):
-            cv3_layer[-1].bias.data[:self.nc] = math.log(5 / self.nc / (640 / max(float(s), 1)) ** 2)  # cls
+            cv3_layer[-1].bias.data[: self.nc] = math.log(5 / self.nc / (640 / max(float(s), 1)) ** 2)  # cls
 
     def forward(self, x):
         if self.training:
@@ -1291,8 +1273,8 @@ class PoseRTMO(nn.Module):
             feats, kpt_list = [], []
             for i in range(self.nl):
                 xi = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
-                feats.append(xi[:, :self.no, :, :])
-                kpt_raw = xi[:, self.no:, :, :]  # (B, nk, H, W)
+                feats.append(xi[:, : self.no, :, :])
+                kpt_raw = xi[:, self.no :, :, :]  # (B, nk, H, W)
                 # Apply STGR if enabled
                 if self.graph_refine is not None:
                     B, nk, H, W = kpt_raw.shape
@@ -1302,7 +1284,7 @@ class PoseRTMO(nn.Module):
                     kpt_raw = kpt_r.reshape(B, H, W, nk).permute(0, 3, 1, 2)
                 kpt_list.append(kpt_raw.flatten(2))
             return feats, torch.cat(kpt_list, dim=2)
-        
+
         else:
             # 🔹 推理模式：返回 (B, 4+nc+nk, N_total) 格式供 NMS（NMS 期望 B,C,N 格式）
             box_feats = []
@@ -1310,12 +1292,12 @@ class PoseRTMO(nn.Module):
             cls_kpt_flats = []
 
             for i in range(self.nl):
-                box_dist = self.cv2[i](x[i])      # (B, 64, H, W)
-                cls_kpt = self.cv3[i](x[i])       # (B, nc+nk, H, W)
+                box_dist = self.cv2[i](x[i])  # (B, 64, H, W)
+                cls_kpt = self.cv3[i](x[i])  # (B, nc+nk, H, W)
                 box_feats.append(box_dist)
                 B, _, H, W = box_dist.shape
-                box_dists.append(box_dist.view(B, self.reg_max * 4, H * W))        # (B, 64, N)
-                cls_kpt_flats.append(cls_kpt.view(B, self.nc + self.nk, H * W))   # (B, nc+nk, N)
+                box_dists.append(box_dist.view(B, self.reg_max * 4, H * W))  # (B, 64, N)
+                cls_kpt_flats.append(cls_kpt.view(B, self.nc + self.nk, H * W))  # (B, nc+nk, N)
 
             # 缓存锚点与步幅
             shape = box_feats[0].shape
@@ -1324,14 +1306,14 @@ class PoseRTMO(nn.Module):
                 self.shape = shape
 
             # DFL → dist2bbox → xywh 像素坐标
-            box_dist_all = torch.cat(box_dists, dim=2)                             # (B, 64, N_total)
+            box_dist_all = torch.cat(box_dists, dim=2)  # (B, 64, N_total)
             bboxes = dist2bbox(self.dfl(box_dist_all), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
             # bboxes: (B, 4, N_total)
 
             # cls sigmoid；解码关键点到像素坐标
-            cls_kpt_all = torch.cat(cls_kpt_flats, dim=2)                          # (B, nc+nk, N_total)
-            cls_all = cls_kpt_all[:, :self.nc].sigmoid()                           # (B, nc, N_total)
-            kpt_all = cls_kpt_all[:, self.nc:].clone()                             # (B, nk, N_total)
+            cls_kpt_all = torch.cat(cls_kpt_flats, dim=2)  # (B, nc+nk, N_total)
+            cls_all = cls_kpt_all[:, : self.nc].sigmoid()  # (B, nc, N_total)
+            kpt_all = cls_kpt_all[:, self.nc :].clone()  # (B, nk, N_total)
 
             # Apply STGR if enabled (before coordinate decode)
             if self.graph_refine is not None:
@@ -1344,11 +1326,11 @@ class PoseRTMO(nn.Module):
             # kpt_shape[1] 可能为 5 (x,y,vis,log_sx,log_sy) 含 RLE sigma 通道
             # 推理输出只保留 x,y,vis（前3或前2维），log_sigma 不对外暴露
             ndim = self.kpt_shape[1]  # 2/3/5
-            out_ndim = min(ndim, 3)   # 推理只输出最多3维(x,y,vis)
+            out_ndim = min(ndim, 3)  # 推理只输出最多3维(x,y,vis)
             kpt_all[:, 0::ndim] = (kpt_all[:, 0::ndim] * 2.0 + (self.anchors[[0]] - 0.5)) * self.strides
             kpt_all[:, 1::ndim] = (kpt_all[:, 1::ndim] * 2.0 + (self.anchors[[1]] - 0.5)) * self.strides
             if ndim >= 3:
-                kpt_all[:, 2::ndim] = kpt_all[:, 2::ndim].sigmoid()               # 可见性
+                kpt_all[:, 2::ndim] = kpt_all[:, 2::ndim].sigmoid()  # 可见性
 
             # 如果有 log_sigma 通道（ndim==5），重组为只含 x,y,vis 的输出
             if ndim > 3:
