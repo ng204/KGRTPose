@@ -1,52 +1,73 @@
 #!/usr/bin/env python3
 """
 AnimalPose 数据集可视化脚本 - 最终完整版本
-正确的标签格式: [class, bbox_x, bbox_y, bbox_w, bbox_h, kpt0_x, kpt0_y, kpt0_v, kpt1_x, kpt1_y, kpt1_v, ...]
+正确的标签格式: [class, bbox_x, bbox_y, bbox_w, bbox_h, kpt0_x, kpt0_y, kpt0_v, kpt1_x, kpt1_y, kpt1_v, ...].
 """
 
-import os
-import cv2
-import numpy as np
 from pathlib import Path
+
+import cv2
 from tqdm import tqdm
 
 # AnimalPose 数据集的骨架连接定义
 SKELETON_CONNECTIONS = [
-    (0, 1), (0, 2),                    # 鼻子到眼睛
-    (1, 3), (2, 4),                    # 眼睛到耳朵
-    (5, 6),                            # 肩膀之间
-    (5, 7), (6, 8),                    # 肩膀到肘部
-    (7, 9), (8, 10),                   # 肘部到腕部
-    (5, 11), (6, 12),                  # 肩膀到髋部
-    (11, 12),                          # 髋部之间
-    (11, 13), (12, 14),                # 髋部到膝盖
-    (13, 15), (14, 16),                # 膝盖到踝部
-    (12, 17),                          # 髋部右到尾部根
-    (17, 18), (18, 19)                 # 尾部连接
+    (0, 1),
+    (0, 2),  # 鼻子到眼睛
+    (1, 3),
+    (2, 4),  # 眼睛到耳朵
+    (5, 6),  # 肩膀之间
+    (5, 7),
+    (6, 8),  # 肩膀到肘部
+    (7, 9),
+    (8, 10),  # 肘部到腕部
+    (5, 11),
+    (6, 12),  # 肩膀到髋部
+    (11, 12),  # 髋部之间
+    (11, 13),
+    (12, 14),  # 髋部到膝盖
+    (13, 15),
+    (14, 16),  # 膝盖到踝部
+    (12, 17),  # 髋部右到尾部根
+    (17, 18),
+    (18, 19),  # 尾部连接
 ]
 
 KPT_NAMES = [
-    'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
-    'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
-    'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
-    'left_knee', 'right_knee', 'left_ankle', 'right_ankle',
-    'tail_root', 'tail_mid', 'tail_tip'
+    "nose",
+    "left_eye",
+    "right_eye",
+    "left_ear",
+    "right_ear",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hip",
+    "right_hip",
+    "left_knee",
+    "right_knee",
+    "left_ankle",
+    "right_ankle",
+    "tail_root",
+    "tail_mid",
+    "tail_tip",
 ]
 
+
 def parse_animalpose_label(label_path, img_height, img_width):
+    """解析 AnimalPose YOLO 格式标签 格式: [class_id, bbox_x, bbox_y, bbox_w, bbox_h, kpt0_x, kpt0_y, kpt0_v, ...] 返回: keypoints
+    列表 (x, y, visibility) 和 bbox.
     """
-    解析 AnimalPose YOLO 格式标签
-    格式: [class_id, bbox_x, bbox_y, bbox_w, bbox_h, kpt0_x, kpt0_y, kpt0_v, ...]
-    返回: keypoints 列表 (x, y, visibility) 和 bbox
-    """
-    with open(label_path, 'r') as f:
+    with open(label_path) as f:
         parts = f.read().strip().split()
 
     if len(parts) < 65:
         return None, None
 
     # 解析类别和 bbox
-    class_id = int(parts[0])
+    int(parts[0])
     bbox_x = float(parts[1]) * img_width
     bbox_y = float(parts[2]) * img_height
     bbox_w = float(parts[3]) * img_width
@@ -67,8 +88,9 @@ def parse_animalpose_label(label_path, img_height, img_width):
 
     return keypoints, bbox
 
+
 def draw_keypoints_and_skeleton(img, keypoints, bbox=None):
-    """在图上绘制关键点和骨架"""
+    """在图上绘制关键点和骨架."""
     img_drawn = img.copy()
 
     if keypoints is None or len(keypoints) < 20:
@@ -77,8 +99,7 @@ def draw_keypoints_and_skeleton(img, keypoints, bbox=None):
     # 绘制 bbox (可选)
     if bbox:
         x, y, w, h = bbox
-        cv2.rectangle(img_drawn, (int(x-w/2), int(y-h/2)),
-                     (int(x+w/2), int(y+h/2)), (255, 255, 0), 2)
+        cv2.rectangle(img_drawn, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)), (255, 255, 0), 2)
 
     # 绘制骨架连接 (绿色)
     for start_idx, end_idx in SKELETON_CONNECTIONS:
@@ -99,23 +120,25 @@ def draw_keypoints_and_skeleton(img, keypoints, bbox=None):
             cv2.circle(img_drawn, pt, 5, (0, 255, 0), -1)
             cv2.circle(img_drawn, pt, 5, (255, 255, 255), 1)
             # 添加关键点编号
-            cv2.putText(img_drawn, str(idx), (pt[0] + 8, pt[1] - 5),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            cv2.putText(img_drawn, str(idx), (pt[0] + 8, pt[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
         else:  # 不可见的关键点用红色标记
             cv2.circle(img_drawn, pt, 4, (0, 0, 255), -1)
 
     return img_drawn
 
+
 def main():
-    dataset_dir = Path('/home/ng204/GH/ultralytics+rtmo/datasets/animalpose_yolo')
-    images_dir = dataset_dir / 'images' / 'test'
-    labels_dir = dataset_dir / 'labels' / 'test'
-    output_dir = Path('/home/ng204/GH/ultralytics+rtmo/runs/keshihua/animalpose')
+    dataset_dir = Path("/home/ng204/GH/ultralytics+rtmo/datasets/animalpose_yolo")
+    images_dir = dataset_dir / "images" / "test"
+    labels_dir = dataset_dir / "labels" / "test"
+    output_dir = Path("/home/ng204/GH/ultralytics+rtmo/runs/keshihua/animalpose")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 获取所有图片
-    image_files = sorted(images_dir.glob('*.jpeg')) + sorted(images_dir.glob('*.jpg')) + sorted(images_dir.glob('*.png'))
+    image_files = (
+        sorted(images_dir.glob("*.jpeg")) + sorted(images_dir.glob("*.jpg")) + sorted(images_dir.glob("*.png"))
+    )
 
     print(f"Found {len(image_files)} images")
 
@@ -131,7 +154,7 @@ def main():
 
             h, w = img.shape[:2]
 
-            label_file = labels_dir / (img_file.stem + '.txt')
+            label_file = labels_dir / (img_file.stem + ".txt")
             if not label_file.exists():
                 fail_count += 1
                 continue
@@ -143,18 +166,19 @@ def main():
 
             img_vis = draw_keypoints_and_skeleton(img, kpts, bbox)
 
-            output_path = output_dir / (img_file.stem + '_vis.jpg')
+            output_path = output_dir / (img_file.stem + "_vis.jpg")
             cv2.imwrite(str(output_path), img_vis)
             success_count += 1
 
-        except Exception as e:
+        except Exception:
             fail_count += 1
             continue
 
-    print(f"\nVisualization complete!")
+    print("\nVisualization complete!")
     print(f"Success: {success_count}")
     print(f"Failed: {fail_count}")
     print(f"Saved to: {output_dir}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

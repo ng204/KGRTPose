@@ -19,12 +19,15 @@ Revision History:
 """
 
 import argparse
-from ultralytics import YOLO
-import yaml
-from ultralytics.utils.pose_cfg import SetSkeleton
+import os
+
 import cv2
 import numpy as np
-import os
+import yaml
+
+from ultralytics import YOLO
+from ultralytics.utils.pose_cfg import SetSkeleton
+
 
 def plot_results(result, im_black, args):
     """Save the results on different backgrounds."""
@@ -47,9 +50,10 @@ def plot_results(result, im_black, args):
         kpt_line=args.kpt_line,
         labels=args.show_labels,
         boxes=args.show_boxes,
-        )
-    
+    )
+
     return im
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -83,13 +87,12 @@ if __name__ == "__main__":
 
     if args.dataset is not None:
         data = f"configs/data/{args.dataset}.yaml"
-    
+
     data_cdg = yaml.load(open(f"configs/data/{args.dataset}.yaml"), Loader=yaml.FullLoader)
-    
-    if "skeleton" in data_cdg.keys():
+
+    if "skeleton" in data_cdg:
         SetSkeleton(data_cdg["skeleton"])
 
-    
     results = model(
         args.source,
         conf=args.conf,
@@ -106,14 +109,14 @@ if __name__ == "__main__":
         classes=args.classes,
         retina_masks=args.retina_masks,
         embed=args.embed,
-        stream=True
-        )
-    
+        stream=True,
+    )
+
     cap = cv2.VideoCapture(args.source)
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_name = os.path.splitext(os.path.basename(args.source))[0]
     out = cv2.VideoWriter(f"{args.project}/{video_name}.mp4", fourcc, fps, (width, height))
 
@@ -125,6 +128,6 @@ if __name__ == "__main__":
             im_current = im_previous
         out.write(im_current)
         im_previous = im_current
-    
+
     out.release()
     cap.release()
