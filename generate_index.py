@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""
-生成可视化结果的HTML索引页面
-"""
+"""生成可视化结果的HTML索引页面."""
 
 import os
-from pathlib import Path
 
 OUTPUT_ROOT = "/home/ng204/GH/ultralytics+rtmo/runs/keshihua/2"
 ANIMALPOSE_DIR = f"{OUTPUT_ROOT}/animalpose_yolo"
@@ -12,19 +9,16 @@ ATRW_DIR = f"{OUTPUT_ROOT}/atrw"
 
 
 def get_image_list(directory):
-    """获取目录中的所有图片"""
+    """获取目录中的所有图片."""
     images = []
     for img_file in sorted(os.listdir(directory)):
-        if img_file.endswith(('.jpg', '.png')):
-            images.append({
-                'name': img_file,
-                'path': f"{os.path.basename(directory)}/{img_file}"
-            })
+        if img_file.endswith((".jpg", ".png")):
+            images.append({"name": img_file, "path": f"{os.path.basename(directory)}/{img_file}"})
     return images
 
 
 def generate_html():
-    """生成HTML索引页面"""
+    """生成HTML索引页面."""
     animalpose_images = get_image_list(ANIMALPOSE_DIR)
     atrw_images = get_image_list(ATRW_DIR)
 
@@ -374,7 +368,7 @@ def generate_html():
 
     # 保存HTML文件
     html_path = f"{OUTPUT_ROOT}/index.html"
-    with open(html_path, 'w', encoding='utf-8') as f:
+    with open(html_path, "w", encoding="utf-8") as f:
         f.write(html)
 
     print(f"✅ HTML索引页面已生成: {html_path}")
