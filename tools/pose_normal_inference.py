@@ -19,8 +19,10 @@ Revision History:
 """
 
 import argparse
-from ultralytics import YOLO
+
 import yaml
+
+from ultralytics import YOLO
 from ultralytics.utils.pose_cfg import SetSkeleton
 
 if __name__ == "__main__":
@@ -62,12 +64,11 @@ if __name__ == "__main__":
 
     if args.dataset is not None:
         data = f"configs/data/{args.dataset}.yaml"
-    
-    data_cdg = yaml.load(open(f"configs/data/{args.dataset}.yaml"), Loader=yaml.FullLoader)
-    
-    if "skeleton" in data_cdg.keys():
-        SetSkeleton(data_cdg["skeleton"])
 
+    data_cdg = yaml.load(open(f"configs/data/{args.dataset}.yaml"), Loader=yaml.FullLoader)
+
+    if "skeleton" in data_cdg:
+        SetSkeleton(data_cdg["skeleton"])
 
     model.predict(
         source=args.source,
