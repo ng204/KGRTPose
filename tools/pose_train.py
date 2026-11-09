@@ -24,9 +24,9 @@ import os
 import subprocess
 from datetime import datetime
 
+
 def parse_models(models_str, model_type="animalrtpose"):
     """Parse the comma-separated list of model codes into a list of model YAML files."""
-    
     # Define mappings from model codes to YAML file names for each model type
     model_mappings = {
         "animalrtpose": {
@@ -34,82 +34,84 @@ def parse_models(models_str, model_type="animalrtpose"):
             "s": "animalrtpose-s.yaml",
             "m": "animalrtpose-m.yaml",
             "l": "animalrtpose-l.yaml",
-            "x": "animalrtpose-x.yaml"
+            "x": "animalrtpose-x.yaml",
         },
         "yolov8-pose": {
             "n": "yolov8n-pose.yaml",
             "s": "yolov8s-pose.yaml",
             "m": "yolov8m-pose.yaml",
             "l": "yolov8l-pose.yaml",
-            "x": "yolov8x-pose.yaml"
+            "x": "yolov8x-pose.yaml",
         },
         "yolo11-pose": {
             "n": "yolo11n-pose.yaml",
             "s": "yolo11s-pose.yaml",
             "m": "yolo11m-pose.yaml",
             "l": "yolo11l-pose.yaml",
-            "x": "yolo11x-pose.yaml"
+            "x": "yolo11x-pose.yaml",
         },
         "spipose": {
             "n": "spipose-n.yaml",
             "s": "spipose-s.yaml",
             "m": "spipose-m.yaml",
             "l": "spipose-l.yaml",
-            "x": "spipose-x.yaml"
-        }
+            "x": "spipose-x.yaml",
+        },
     }
-    
+
     # Check if the provided model type is valid
     if model_type not in model_mappings:
         raise ValueError(f"Invalid model type: {model_type}. Valid types are {', '.join(model_mappings.keys())}.")
-    
+
     # Get the mapping for the specific model type
     mapping = model_mappings[model_type]
-    
+
     # Split the input string into individual model codes and map them to YAML file names
     models = [mapping[code.strip()] for code in models_str.split(",") if code.strip() in mapping]
-    
+
     return models
 
+
 def build_output_dir(
-    base_dir, 
-    optical_field_sizes=None, 
-    sub_optical_field_sizes=None, 
-    window_size=None, 
-    seed=None, 
-    hadamard_seed=None, 
-    inverse=False, 
+    base_dir,
+    optical_field_sizes=None,
+    sub_optical_field_sizes=None,
+    window_size=None,
+    seed=None,
+    hadamard_seed=None,
+    inverse=False,
     imgsz_hadamard=None,
-    aliasing=False
+    aliasing=False,
 ):
     """Build the save directory based on the provided arguments."""
     base_dir = f"{base_dir}"
-    
+
     if optical_field_sizes is not None:
         base_dir += f"-{optical_field_sizes}x{optical_field_sizes}"
-    
+
     if sub_optical_field_sizes is not None:
         base_dir += f"-{sub_optical_field_sizes}x{sub_optical_field_sizes}"
-    
+
     if window_size is not None:
         base_dir += f"-{window_size[0]}x{window_size[1]}"
 
     if inverse:
         base_dir += "-inverse"
-    
+
     if aliasing:
         base_dir += "-aliasing"
-    
+
     if imgsz_hadamard is not None:
         base_dir += f"-{imgsz_hadamard}"
-    
+
     if hadamard_seed is not None:
         base_dir += f"-{hadamard_seed}"
-    
+
     if seed is not None:
         base_dir += f"-{seed}"
-    
+
     return base_dir
+
 
 def get_pretrained_model(model_yaml):
     """Get the path to the pretrained model if it exists."""
@@ -120,6 +122,7 @@ def get_pretrained_model(model_yaml):
     else:
         print(f"Warning: Pretrained model {pretrained_model} not found. Skipping...")
         return None
+
 
 def construct_train_command(args, model_yaml, pretrained_model):
     """Construct the yolo pose train command."""
@@ -134,7 +137,7 @@ def construct_train_command(args, model_yaml, pretrained_model):
         hadamard_seed=args.hadamard_seed,
         inverse=args.inverse,
         imgsz_hadamard=args.imgsz_hadamard,
-        aliasing=args.aliasing
+        aliasing=args.aliasing,
     )
     output_dir = f"./runs/{args.model_type}/train/{args.dataset}"
 
@@ -155,11 +158,12 @@ def construct_train_command(args, model_yaml, pretrained_model):
         f"seed={args.seed}",
         f"pose={args.pose}",
         f"patience={args.patience}",
-        f"cos_lr=True",
-        f"resume=True",
+        "cos_lr=True",
+        "resume=True",
     ]
 
     return [arg for arg in cmd if arg]
+
 
 def rename_dataset_directory(original_name, temp_name):
     """Rename the dataset directory."""
@@ -167,6 +171,7 @@ def rename_dataset_directory(original_name, temp_name):
         os.rename(original_name, temp_name)
     else:
         print(f"Dataset directory {original_name} does not exist.")
+
 
 def main():
     # Get the current date and time for the output directory
@@ -205,18 +210,43 @@ def main():
     parser.add_argument("--patience", type=int, default=default_settings["patience"], help="Early stopping patience.")
     parser.add_argument("--batch", type=int, default=default_settings["batch"], help="Batch size.")
     parser.add_argument("--imgsz", type=int, default=default_settings["imgsz"], help="Image size.")
-    parser.add_argument("--device", type=str, default=default_settings["device"], help="Device to use (e.g., 0, 1, 2, cpu).")
+    parser.add_argument(
+        "--device", type=str, default=default_settings["device"], help="Device to use (e.g., 0, 1, 2, cpu)."
+    )
     parser.add_argument("--model-type", type=str, default=default_settings["model_type"], help="Model type.")
     parser.add_argument("--models", type=str, help="Comma-separated list of model codes (n, s, m, l, x).")
     parser.add_argument("--no-pretrained", action="store_true", help="Not use a pretrained model.")
     parser.add_argument("--workers", type=int, default=default_settings["workers"], help="Number of workers.")
     parser.add_argument("--seed", type=int, default=default_settings["seed"], help="Random seed.")
     parser.add_argument("--pose", type=float, default=default_settings["pose"], help="Pose loss weight.")
-    parser.add_argument("--optical-field-sizes", type=int, default=default_settings["optical_field_sizes"], help="Optical field size for the entire image.")
-    parser.add_argument("--sub-optical-field-sizes", type=int, default=default_settings["sub_optical_field_sizes"], help="Optical field size for sub-regions of the image.")
-    parser.add_argument("--window-size", nargs=2, type=int, default=default_settings["window_size"], help="Window size for sub-regions of the image.")
-    parser.add_argument("--inverse", action="store_true", help="Order the images by their size before splitting into sub-regions.")
-    parser.add_argument("--imgsz-hadamard", type=int, default=None, help="Image size for the Hadamard transform. If not provided, it will be set to imgsz.")
+    parser.add_argument(
+        "--optical-field-sizes",
+        type=int,
+        default=default_settings["optical_field_sizes"],
+        help="Optical field size for the entire image.",
+    )
+    parser.add_argument(
+        "--sub-optical-field-sizes",
+        type=int,
+        default=default_settings["sub_optical_field_sizes"],
+        help="Optical field size for sub-regions of the image.",
+    )
+    parser.add_argument(
+        "--window-size",
+        nargs=2,
+        type=int,
+        default=default_settings["window_size"],
+        help="Window size for sub-regions of the image.",
+    )
+    parser.add_argument(
+        "--inverse", action="store_true", help="Order the images by their size before splitting into sub-regions."
+    )
+    parser.add_argument(
+        "--imgsz-hadamard",
+        type=int,
+        default=None,
+        help="Image size for the Hadamard transform. If not provided, it will be set to imgsz.",
+    )
     parser.add_argument("--aliasing", action="store_true", help="Use aliasing for the Hadamard transform.")
     parser.add_argument("--hadamard-seed", type=int, default=None, help="Random seed for the Hadamard transform.")
 
@@ -227,23 +257,22 @@ def main():
         models = parse_models("n,s,m,l,x", model_type=args.model_type)
     else:
         models = parse_models(args.models, model_type=args.model_type)
-    
 
     # Rename the dataset directory before training
     temp_dataset_dir = f"./datasets/{args.dataset}/images"
     original_dataset_dir = build_output_dir(
-            base_dir=temp_dataset_dir,
-            optical_field_sizes=args.optical_field_sizes,
-            sub_optical_field_sizes=args.sub_optical_field_sizes,
-            window_size=args.window_size,
-            inverse=args.inverse,
-            imgsz_hadamard=args.imgsz_hadamard,
-            aliasing=args.aliasing,
-            hadamard_seed=args.hadamard_seed,
-        )
+        base_dir=temp_dataset_dir,
+        optical_field_sizes=args.optical_field_sizes,
+        sub_optical_field_sizes=args.sub_optical_field_sizes,
+        window_size=args.window_size,
+        inverse=args.inverse,
+        imgsz_hadamard=args.imgsz_hadamard,
+        aliasing=args.aliasing,
+        hadamard_seed=args.hadamard_seed,
+    )
     if original_dataset_dir == temp_dataset_dir:
         original_dataset_dir = f"./datasets/{args.dataset}/images_"
-    
+
     rename_dataset_directory(original_dataset_dir, temp_dataset_dir)
 
     try:
@@ -259,6 +288,7 @@ def main():
             subprocess.run(train_cmd, check=True)
     finally:
         rename_dataset_directory(temp_dataset_dir, original_dataset_dir)
+
 
 if __name__ == "__main__":
     main()
