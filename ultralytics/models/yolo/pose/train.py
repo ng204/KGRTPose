@@ -6,8 +6,6 @@ from copy import copy
 from pathlib import Path
 from typing import Any
 
-import torch
-
 from ultralytics.models import yolo
 from ultralytics.nn.tasks import PoseModel
 from ultralytics.utils import DEFAULT_CFG, LOGGER
@@ -15,8 +13,7 @@ from ultralytics.utils.plotting import plot_results
 
 
 class PoseTrainer(yolo.detect.DetectionTrainer):
-    """
-    A class extending the DetectionTrainer class for training YOLO pose estimation models.
+    """A class extending the DetectionTrainer class for training YOLO pose estimation models.
 
     This trainer specializes in handling pose estimation tasks, managing model training, validation, and visualization
     of pose keypoints alongside bounding boxes.
@@ -43,8 +40,7 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
     """
 
     def __init__(self, cfg=DEFAULT_CFG, overrides: dict[str, Any] | None = None, _callbacks=None):
-        """
-        Initialize a PoseTrainer object for training YOLO pose estimation models.
+        """Initialize a PoseTrainer object for training YOLO pose estimation models.
 
         This initializes a trainer specialized for pose estimation tasks, setting the task to 'pose' and
         handling specific configurations needed for keypoint detection models.
@@ -54,15 +50,15 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
             overrides (dict, optional): Dictionary of parameter overrides for the default configuration.
             _callbacks (list, optional): List of callback functions to be executed during training.
 
-        Notes:
-            This trainer will automatically set the task to 'pose' regardless of what is provided in overrides.
-            A warning is issued when using Apple MPS device due to known bugs with pose models.
-
         Examples:
             >>> from ultralytics.models.yolo.pose import PoseTrainer
             >>> args = dict(model="yolo11n-pose.pt", data="coco8-pose.yaml", epochs=3)
             >>> trainer = PoseTrainer(overrides=args)
             >>> trainer.train()
+
+        Notes:
+            This trainer will automatically set the task to 'pose' regardless of what is provided in overrides.
+            A warning is issued when using Apple MPS device due to known bugs with pose models.
         """
         if overrides is None:
             overrides = {}
@@ -84,8 +80,7 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
         weights: str | Path | None = None,
         verbose: bool = True,
     ) -> PoseModel:
-        """
-        Get pose estimation model with specified configuration and weights.
+        """Get pose estimation model with specified configuration and weights.
 
         Args:
             cfg (str | Path | dict, optional): Model configuration file path or dictionary.
@@ -116,8 +111,7 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
         )
 
     def _inject_symmetry_pairs(self):
-        """
-        从 data.yaml 的 flip_idx 推导对称骨骼对，注入到 criterion 中。
+        """从 data.yaml 的 flip_idx 推导对称骨骼对，注入到 criterion 中。.
 
         在第一个 epoch 开始之前调用（通过 on_train_start 回调触发）。
         不需要遍历训练数据，只需读取 flip_idx 和 skeleton。
@@ -144,7 +138,7 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
         for i, j in skeleton:
             fi, fj = flip_idx[i], flip_idx[j]
             key_orig = (min(i, j), max(i, j))
-            key_sym  = (min(fi, fj), max(fi, fj))
+            key_sym = (min(fi, fj), max(fi, fj))
             if key_sym in skel_set and key_sym != key_orig:
                 pair_key = (min(key_orig, key_sym), max(key_orig, key_sym))
                 if pair_key not in seen:
@@ -159,7 +153,7 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
         LOGGER.info(f"PoseTrainer: 注入 {len(sym_pairs)} 对对称骨骼约束 ✓  {sym_pairs}")
 
     def on_train_start(self):
-        """训练开始时注入骨骼对称约束对。"""
+        """训练开始时注入骨骼对称约束对。."""
         super_fn = getattr(super(), "on_train_start", None)
         if super_fn is not None:
             super_fn()
@@ -170,8 +164,7 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
         plot_results(file=self.csv, pose=True, on_plot=self.on_plot)  # save results.png
 
     def get_dataset(self) -> dict[str, Any]:
-        """
-        Retrieve the dataset and ensure it contains the required `kpt_shape` key.
+        """Retrieve the dataset and ensure it contains the required `kpt_shape` key.
 
         Returns:
             (dict): A dictionary containing the training/validation/test dataset and category names.
