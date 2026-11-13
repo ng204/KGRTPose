@@ -99,7 +99,7 @@ jobs:
           print(json.dumps(response.json(), indent=2))
 
   Benchmarks:
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.benchmarks == 'true'
+    if: ${{ false }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
