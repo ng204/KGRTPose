@@ -452,19 +452,19 @@ def check_det_dataset(dataset: str, autodownload: bool = True) -> dict[str, Any]
                 data[k] = str(x)
             else:
                 data[k] = [str((path / x).resolve()) for x in data[k]]
-    
-    # Set OKS Sigmas
-    if "oks_sigmas" not in data and "kpt_shape" in data:
-        if data["kpt_shape"][0] != 17: # default 17 sigmas for COCO
-            SetDefaultOKSSigma(data["kpt_shape"][0])
-    else:
-        SetOKSSigma(data["oks_sigmas"])
-    
-    # Set skeleton
-    if "skeleton" in data:
-        SetSkeleton(data["skeleton"])
-    else:
-        if data["kpt_shape"][0] != 17: # default 17 skeleton for COCO
+
+    # Set OKS Sigmas and skeleton only for pose datasets
+    if "kpt_shape" in data:
+        num_keypoints = data["kpt_shape"][0]
+
+        if "oks_sigmas" in data:
+            SetOKSSigma(data["oks_sigmas"])
+        elif num_keypoints != 17:
+            SetDefaultOKSSigma(num_keypoints)
+
+        if "skeleton" in data:
+            SetSkeleton(data["skeleton"])
+        elif num_keypoints != 17:
             SetSkeleton(None)
 
     # Parse YAML
