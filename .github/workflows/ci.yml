@@ -115,9 +115,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v6
       - name: Install requirements
-        shell: bash # for Windows compatibility
+        shell: bash
         run: |
-          uv pip install --system -e ".[export]" "coverage[toml]" --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match
+          uv pip install --system -e ".[export]" "coverage[toml]" onnxscript --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match
+          python -c "import onnxscript; print('onnxscript:', onnxscript.__version__)"
       - name: Check environment
         run: |
           yolo checks
